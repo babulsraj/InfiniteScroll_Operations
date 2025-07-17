@@ -36,6 +36,8 @@ class Presenter: ObservableObject {
     private var opDic: [Int:Operation] = [:]
     var operationDic: [Int:ImgaeDownload] = [:]
     let downloadQueue = OperationQueue()
+    private var imageCache = NSCache<NSNumber, UIImage>()
+    
     init() {
         //downloadQueue.maxConcurrentOperationCount = 5
     }
@@ -63,20 +65,29 @@ class Presenter: ObservableObject {
     }
     
     func getImage(index:Int) -> Bool? {
-        print("called from view index = \(index)")
-//        _ = opDic.map({ index,operation in
-//            if index
-//        })
+        if let cachedImage = imageCache.object(forKey: NSNumber(value: users[index].id)) {
+            users[index].image = cachedImage
+            return true
+        }
         
-        let operarion = ImgaeDownload(user: users[index])
-        downloadQueue.addOperation(operarion)
-        operarion.completionBlock = {
-            DispatchQueue.main.async { [weak self] in
-                print("Just finished = \(index)")
-                self?.users[index].image = operarion.user?.image
+        if let existingOperation = operationDic[index] {
+            existingOperation.cancel()
+        }
+        
+        let operation = ImgaeDownload(user: users[index])
+        operationDic[index] = operation
+        
+        operation.completionBlock = { [weak self] in
+            DispatchQueue.main.async {
+                if !operation.isCancelled, let image = operation.user?.image {
+                    self?.imageCache.setObject(image, forKey: NSNumber(value: self?.users[index].id ?? 0))
+                    self?.users[index].image = image
+                }
+                self?.operationDic.removeValue(forKey: index)
             }
         }
         
+        downloadQueue.addOperation(operation)
         return true
     }
     
@@ -110,26 +121,26 @@ class ImgaeDownload:AsyncOperation {
     }
     
     override func main() {
-        if isCancelled {
+        guard !isCancelled else {
+            state = .isFinished
             return
         }
         
         guard let url = url else {
+            state = .isFinished
             return
         }
         
         do {
-            if isCancelled {
-                return
-            }
             let data = try Data(contentsOf: url)
-            if let image = UIImage(data: data) {
+            if !isCancelled, let image = UIImage(data: data) {
                 self.user?.image = image
             }
         } catch {
-            
+            print("Image download error: \(error)")
         }
         
+        state = .isFinished
     }
 }
 

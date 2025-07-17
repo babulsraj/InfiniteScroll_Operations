@@ -31,6 +31,7 @@ struct ContentView: View {
                     VStack {
                         Text("\(presenter.users[item].login)")
                             .onAppear {
+                                presenter.getImage(index: item)
                                 if presenter.shouldLoadData(id: item) {
                                     presenter.getData(index: presenter.users[item].id)
                                 }
@@ -41,6 +42,8 @@ struct ContentView: View {
                         if let image = presenter.users[item].image {
                             Image(uiImage: image)
                                 .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 150, height: 150)
                         }
                         
 //                        if presenter.isItTrue(index: item) {
@@ -68,5 +71,3 @@ struct ContentView_Previews: PreviewProvider {
         ContentView()
     }
 }
-
-
